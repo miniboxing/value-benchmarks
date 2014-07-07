@@ -1,5 +1,5 @@
 
-name := "value-benchmarks"
+name := "valium-benchmarks"
 
 scalaVersion in Global := "2.11.1"
 
