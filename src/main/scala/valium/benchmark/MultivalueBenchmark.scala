@@ -30,7 +30,7 @@ object MultivalueBenchmark extends PerformanceTest {
   case class Three(a: Long, b: Long, c: Long)
   case class SumProd(sum: Long, prod: Long)
 
-  val NumIterations = 1000000
+  val NumIterations = 10000000
 
   var r: SumProd = SumProd(1,2)
 
@@ -138,6 +138,65 @@ object MultivalueBenchmark extends PerformanceTest {
         val s = getStorage()
         while (i > 0) {
           val s1 = s
+          s1.val1 = rs2
+          s1.val2 = rp2
+          s1.val3 = rs2 + rp2
+
+          val s2 = fMultivalue(s1)
+
+          rs2 = s2.val1
+          rp2 = s2.val2
+
+          i -= 1
+        }
+      }
+    }
+  }
+
+
+  // Using ThreadLocal Cache
+  class CacheMultiValueStorage(val t: Thread) extends MultiValueStorage
+
+  lazy val storageCacheTL = new ThreadLocal[CacheMultiValueStorage]
+  def getStorageFromTL(): CacheMultiValueStorage = {
+    val s = storageCacheTL.get()
+    if (s != null) {
+      s
+    } else {
+      val ns = new CacheMultiValueStorage(Thread.currentThread())
+      storageCacheTL.set(ns)
+      ns
+    }
+  }
+
+  val cacheSize = 100
+  val storageCacheArray = new Array[CacheMultiValueStorage](cacheSize)
+  def getStorageFromCache() = {
+    val t = Thread.currentThread()
+    val tid = t.getId()
+    val idx = (tid % cacheSize).toInt
+    val s = storageCacheArray(idx)
+    if (s != null && s.t == t) {
+      s
+    } else {
+      /*
+        TODO
+        Create an Array of double (triple, ...) size to have
+        an extra fast level for collisions before using the TL
+      */
+      val s = getStorageFromTL()
+      storageCacheArray(idx) = s
+      s
+    }  
+  }
+
+
+  performance of "Smart Cache" in {
+    using(Gen.unit("")) in {
+      (_) => {
+        var i = NumIterations
+        while (i > 0) {
+          val s1 = getStorageFromCache()
           s1.val1 = rs2
           s1.val2 = rp2
           s1.val3 = rs2 + rp2
